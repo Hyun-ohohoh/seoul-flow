@@ -80,5 +80,4 @@ def save_traffic_speed(data):  # data는 딕셔너리 (Python은 타입 명시 �
     db.commit() # 트랜잭션 커밋 (없으면 저장 안 됨)
     db.close()
 
-asyncio.run(collect_all_async())
 

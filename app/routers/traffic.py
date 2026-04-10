@@ -21,8 +21,9 @@ def get_worst_traffic():
         ) AS ts
         LEFT JOIN service_link sl ON ts.link_id::BIGINT = sl.service_link_id
         LEFT JOIN road_link rl ON sl.std_link_id::VARCHAR = rl.link_id
+        WHERE rl.road_name IS NOT NULL
         ORDER BY ts.speed ASC
-        LIMIT 5
+        LIMIT 10
     """))
 
     # 결과를 딕셔너리 리스트로 변환

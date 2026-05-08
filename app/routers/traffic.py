@@ -74,3 +74,28 @@ def get_road_taffic(name: str):
         } for row in result]
     db.close()
     return rows
+
+
+@router.get("/traffic/pattern")
+def get_traffic_pattern(name: str) :
+    db = SessionLocal()
+    result = db.execute(text("""
+        SELECT
+            EXTRACT(HOUR FROM ts.collected_at) as hour,
+            AVG(ts.speed) as avg_speed,
+            AVG(ts.travel_time) as avg_travel_time
+        FROM traffic_speed ts
+        LEFT JOIN service_link sl ON ts.link_id::BIGINT = sl.service_link_id
+        LEFT JOIN road_link rl ON sl.std_link_id::VARCHAR = rl.link_id
+        WHERE rl.road_name LIKE '%' || :name || '%'
+        AND DATE(ts.collected_at) = CURRENT_DATE
+        GROUP BY hour
+        ORDER BY hour
+    """), {"name": name})
+    rows = [{
+        "hour": row[0],
+        "avg_speed": round(row[1], 1),
+        "avg_travel_time": round(row[2], 1)
+        } for row in result]
+    db.close()
+    return rows

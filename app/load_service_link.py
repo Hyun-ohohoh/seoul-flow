@@ -9,7 +9,8 @@ engine = create_engine(os.getenv("DATABASE_URL"))  # DB 연결 엔진 생성
 # Spring의 application.yml DataSource 설정과 같은 역할
 # SessionLocal과 차이: engine은 pandas 전용, SessionLocal은 쿼리 실행용
 
-df = pd.read_excel('/Users/hyun-oh/SideProject/서울특별시 교통소통 표준링크 매핑정보_20250306.xlsx')
+file_path = os.getenv("MAPPING_FILE_PATH")
+df = pd.read_excel(file_path)
 
 df = df.rename(columns={
     '서비스링크': 'service_link_id',

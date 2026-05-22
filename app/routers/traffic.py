@@ -2,10 +2,19 @@ from fastapi import APIRouter
 from app.database import SessionLocal
 from sqlalchemy import text
 
+import json
+from app.redis_client import redis_client
+
 router = APIRouter() # Spring의 @RestController와 같은 역할
 
 @router.get("/traffic/worst")
 def get_worst_traffic():
+    # 1. Redis에서 캐시 확인
+    cached = redis_client.get("traffic:worst")
+    if cached:
+        return json.loads(cached)
+
+    # 2. 캐시 없으면 DB 쿼리
     db = SessionLocal() # DB 세션 열기
     result = db.execute(text("""
         SELECT DISTINCT ts.link_id, ts.speed, ts.travel_time, rl.road_name,
@@ -39,10 +48,22 @@ def get_worst_traffic():
         "end_lng": row[7]
         } for row in result]
     db.close()
+
+    # 3. Redis에 10분간 캐싱
+    redis_client.setex("traffic:worst", 600, json.dumps(rows, default=str))
+
     return rows
     
 @router.get("/traffic/road")
 def get_road_taffic(name: str):
+
+    # 1. Redis에서 캐시 확인
+    cache_key = f"traffic:road:{name}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # 2. 캐시 없으면 DB 쿼리
     db = SessionLocal()
     result = db.execute(text("""
         SELECT ts.link_id, ts.speed, ts.travel_time, rl.road_name,
@@ -73,11 +94,22 @@ def get_road_taffic(name: str):
         "end_lng": row[7]
         } for row in result]
     db.close()
+
+    # 3. Redis에 저장(10분)
+    redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
     return rows
 
 
 @router.get("/traffic/pattern")
 def get_traffic_pattern(name: str) :
+
+    # 1. Redis에서 캐시 확인
+    cache_key = f"traffic:pattern:{name}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+    
+    # 2. 캐시 없으면 DB 쿼리
     db = SessionLocal()
     result = db.execute(text("""
         SELECT
@@ -98,4 +130,7 @@ def get_traffic_pattern(name: str) :
         "avg_travel_time": round(row[2], 1)
         } for row in result]
     db.close()
+    
+    # 3. Redis에 저장(10분)
+    redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
     return rows

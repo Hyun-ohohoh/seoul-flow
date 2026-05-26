@@ -64,6 +64,8 @@ seoul-flow/
 │   ├── redis_client.py           # Redis 연결 설정
 │   ├── main.py                   # FastAPI 앱 진입점 + 스케줄러
 │   └── mcp_server.py             # MCP 서버
+├── Dockerfile
+├── docker-compose.yml
 ├── requirements.txt
 └── .env
 ```
@@ -211,7 +213,25 @@ def get_road_traffic(road_name: str) -> str:
 
 ## 🚀 Getting Started
 
-### 1. 환경변수 설정 (.env)
+### Option A: Docker Compose (권장)
+
+```bash
+# 1. 환경변수 설정
+cp .env.example .env
+# .env 파일에 SEOUL_API_KEY, DB 정보 입력
+
+# 2. 전체 환경 한 번에 실행
+docker compose up
+```
+
+> ⚠️ 초기 실행 시 `road_link`, `service_link` 테이블 데이터 수동 적재 필요  
+> (`load_service_link.py` 실행 및 SHP 데이터 적재)
+
+---
+
+### Option B: 수동 설정
+
+**1. 환경변수 설정 (.env)**
 
 ```
 DATABASE_URL=postgresql://traffic:traffic1234@localhost:5432/trafficdb
@@ -219,7 +239,7 @@ SEOUL_API_KEY=your_seoul_open_api_key
 REDIS_URL=redis://localhost:6379
 ```
 
-### 2. DB 설정 (Docker PostGIS)
+**2. DB 설정 (Docker PostGIS)**
 
 ```bash
 docker run -d \
@@ -231,7 +251,7 @@ docker run -d \
   postgis/postgis:15-3.3
 ```
 
-### 3. Redis 실행
+**3. Redis 실행**
 
 ```bash
 docker run -d \
@@ -240,14 +260,14 @@ docker run -d \
   redis:7
 ```
 
-### 4. 의존성 설치 및 서버 실행
+**4. 의존성 설치 및 서버 실행**
 
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app
 ```
 
-### 5. MCP 서버 설정 (Claude Desktop)
+**5. MCP 서버 설정 (Claude Desktop)**
 
 `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -269,11 +289,13 @@ uvicorn app.main:app
 - **도로명 매핑 불완전**: 서울시 서비스링크 ↔ 표준노드링크 ID 체계가 완전히 일치하지 않아 일부 링크의 도로명이 null로 반환됨
 - **속도 기반 혼잡도**: 교통량(Volume) 데이터 미제공으로 V/C비 기반 LOS 산정 불가 → 속도 기반으로 대체
 - **Redis 캐시 무효화**: 새 수집 완료 시 캐시를 자동으로 삭제하는 로직 미구현
+- **Docker Compose 초기화**: 최초 실행 시 테이블 및 기초 데이터 자동 적재 미구현
 
 ---
 
 ## 📅 Changelog
 
+- **2026.05.26** — Docker Compose 환경 구성 추가
 - **2026.05.13** — Redis 캐싱 추가 (traffic:worst, road, pattern)
 - **2026.05.08** — MCP 서버 연동, Claude 자연어 질의 구현
 - **2026.04.10** — PostGIS 공간 쿼리 및 구간 좌표 API 추가

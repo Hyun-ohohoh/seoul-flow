@@ -47,28 +47,33 @@ async def collect_all_async():
     start = time.time()
     count = 0
 
-    async with httpx.AsyncClient() as client:
-        # AsyncClient: 비동기 HTTP 클라이언트, 하나를 만들어서 여러 요청이 공유
-        for i in range(0, len(links), 20):
-            # 20개씩 묶어서 처리 (한번에 너무 많이 보내면 API 서버 부담)
-            batch = links[i:i+20]
-            results = await asyncio.gather(
-                # Asyncio.gather: 여러 비동기 함수를 동시에 실행하고 결과를 모음
-                # *[...]: 리스트를 개별 인자로 풀어서 전달
-                *[fetch_traffic_async(client, link_id) for link_id in batch]
-            )
-            for result in results:
-                if result:
-                    save_traffic_speed(result)
-                    count += 1
+    db = SessionLocal()  # ★ 세션을 여기서 딱 한 번만 열어서 수집 내내 재사용
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # AsyncClient: 비동기 HTTP 클라이언트, 하나를 만들어서 여러 요청이 공유
+            for i in range(0, len(links), 20):
+                # 20개씩 묶어서 처리 (한번에 너무 많이 보내면 API 서버 부담)
+                batch = links[i:i+20]
+                results = await asyncio.gather(
+                    # Asyncio.gather: 여러 비동기 함수를 동시에 실행하고 결과를 모음
+                    # *[...]: 리스트를 개별 인자로 풀어서 전달
+                    *[fetch_traffic_async(client, link_id) for link_id in batch]
+                )
+                for result in results:
+                    if result:
+                        save_traffic_speed(db, result)
+                        count += 1
+                db.commit()  # ★ 배치(20개)마다 한 번씩 커밋
+    finally:
+        db.close()  # ★ 전체 수집이 끝나면 딱 한 번만 닫음
     
     elapsed = time.time() - start
     print(f"수집 완료: {count}개 저장, 소요 시간: {elapsed:.1f}초")
 
     
 
-def save_traffic_speed(data):  # data는 딕셔너리 (Python은 타입 명시 불필요)
-    db = SessionLocal()
+def save_traffic_speed(db, data):  # data는 딕셔너리 (Python은 타입 명시 불필요)
     db.execute(text("""
         INSERT INTO traffic_speed (link_id, speed, travel_time, collected_at)
         VALUES (:link_id, :speed, :travel_time, NOW())
@@ -76,8 +81,4 @@ def save_traffic_speed(data):  # data는 딕셔너리 (Python은 타입 명시 �
     # :link_id → data['link_id'] 값이 자동으로 바인딩됨
     # Spring MyBatis의 #{linkId}와 같은 개념
     # NOW()는 PostgreSQL 함수, 현재 시간 자동 입력
-
-    db.commit() # 트랜잭션 커밋 (없으면 저장 안 됨)
-    db.close()
-
 

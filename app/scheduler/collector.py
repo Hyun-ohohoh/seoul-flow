@@ -10,6 +10,7 @@ from sqlalchemy import text  # SQL 쿼리 문자열을 SQLAlchemy가 인식하�
 
 load_dotenv()
 API_KEY = os.getenv("SEOUL_API_KEY")
+BATCH_SIZE = 20
 
 def get_target_links():
     db = SessionLocal()  # DB 세션 열기 (Spring의 EntityManager와 비슷)
@@ -52,9 +53,9 @@ async def collect_all_async():
     try:
         async with httpx.AsyncClient() as client:
             # AsyncClient: 비동기 HTTP 클라이언트, 하나를 만들어서 여러 요청이 공유
-            for i in range(0, len(links), 20):
-                # 20개씩 묶어서 처리 (한번에 너무 많이 보내면 API 서버 부담)
-                batch = links[i:i+20]
+            for i in range(0, len(links), BATCH_SIZE):
+                # BATCH_SIZE개씩 묶어서 처리 (한번에 너무 많이 보내면 API 서버 부담)
+                batch = links[i:i+BATCH_SIZE]
                 results = await asyncio.gather(
                     # Asyncio.gather: 여러 비동기 함수를 동시에 실행하고 결과를 모음
                     # *[...]: 리스트를 개별 인자로 풀어서 전달
@@ -64,7 +65,7 @@ async def collect_all_async():
                     if result:
                         save_traffic_speed(db, result)
                         count += 1
-                db.commit()  # ★ 배치(20개)마다 한 번씩 커밋
+                db.commit()  # ★ BATCH_SIZE개마다 한 번씩 커밋
     finally:
         db.close()  # ★ 전체 수집이 끝나면 딱 한 번만 닫음
     

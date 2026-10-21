@@ -50,7 +50,8 @@ def get_worst_traffic():
     db.close()
 
     # 3. Redis에 10분간 캐싱
-    redis_client.setex("traffic:worst", 600, json.dumps(rows, default=str))
+    if rows:  # 빈 결과(첫 수집 전 등)는 캐싱하지 않음
+        redis_client.setex("traffic:worst", 600, json.dumps(rows, default=str))
 
     return rows
     
@@ -66,21 +67,26 @@ def get_road_taffic(name: str):
     # 2. 캐시 없으면 DB 쿼리
     db = SessionLocal()
     result = db.execute(text("""
-        SELECT ts.link_id, ts.speed, ts.travel_time, rl.road_name,
-        ST_Y(ST_StartPoint(rl.geom)) as start_lat,
-        ST_X(ST_StartPoint(rl.geom)) as start_lng,
-        ST_Y(ST_EndPoint(rl.geom)) as end_lat,
-        ST_X(ST_EndPoint(rl.geom)) as end_lng
-        FROM (
-            SELECT DISTINCT ON (link_id) link_id, speed, travel_time
-            FROM traffic_speed
-            WHERE collected_at >= NOW() - INTERVAL '15 minutes'
-            ORDER BY link_id, collected_at DESC
-        ) AS ts
-        LEFT JOIN service_link sl ON ts.link_id::BIGINT = sl.service_link_id
-        LEFT JOIN road_link rl ON sl.std_link_id::VARCHAR = rl.link_id
-        WHERE rl.road_name LIKE '%' || :name || '%'
-        ORDER BY ts.speed ASC
+        SELECT * FROM (
+            -- 서비스링크 1개가 표준링크 여러 개로 매핑되므로, 서비스링크당 1행만 남김
+            SELECT DISTINCT ON (ts.link_id)
+                ts.link_id, ts.speed, ts.travel_time, rl.road_name,
+                ST_Y(ST_StartPoint(rl.geom)) as start_lat,
+                ST_X(ST_StartPoint(rl.geom)) as start_lng,
+                ST_Y(ST_EndPoint(rl.geom)) as end_lat,
+                ST_X(ST_EndPoint(rl.geom)) as end_lng
+            FROM (
+                SELECT DISTINCT ON (link_id) link_id, speed, travel_time
+                FROM traffic_speed
+                WHERE collected_at >= NOW() - INTERVAL '15 minutes'
+                ORDER BY link_id, collected_at DESC
+            ) AS ts
+            LEFT JOIN service_link sl ON ts.link_id::BIGINT = sl.service_link_id
+            LEFT JOIN road_link rl ON sl.std_link_id::VARCHAR = rl.link_id
+            WHERE rl.road_name LIKE '%' || :name || '%'
+            ORDER BY ts.link_id, sl.seq
+        ) AS dedup
+        ORDER BY speed ASC
         LIMIT 10
     """), {"name": name})
     rows = [{
@@ -96,7 +102,8 @@ def get_road_taffic(name: str):
     db.close()
 
     # 3. Redis에 저장(10분)
-    redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
+    if rows:  # 빈 결과는 캐싱하지 않음
+        redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
     return rows
 
 
@@ -132,5 +139,6 @@ def get_traffic_pattern(name: str) :
     db.close()
     
     # 3. Redis에 저장(10분)
-    redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
+    if rows:  # 빈 결과는 캐싱하지 않음
+        redis_client.setex(cache_key, 600, json.dumps(rows, default=str))
     return rows

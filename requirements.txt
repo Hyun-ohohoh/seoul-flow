@@ -6,3 +6,6 @@ apscheduler
 httpx
 python-dotenv
 redis
+mcp
+pandas
+openpyxl

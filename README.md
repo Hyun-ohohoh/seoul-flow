@@ -56,8 +56,6 @@ seoul-flow/
 │   ├── redis_client.py           # Redis 연결 설정
 │   ├── main.py                   # FastAPI 앱 진입점 + 스케줄러
 │   └── mcp_server.py             # MCP 서버
-├── Dockerfile
-├── docker-compose.yml
 └── requirements.txt
 ```
 
@@ -202,8 +200,10 @@ def get_road_traffic(road_name: str) -> str:
 
 ## 🚀 실행 환경
 
-- Docker Compose로 PostgreSQL(PostGIS), Redis, FastAPI 앱을 한 번에 실행 (`docker compose up`)
-- 서울 열린데이터광장 API 키와 도로 링크·매핑 데이터는 별도로 준비해 `.env`에 설정
+- PostgreSQL(PostGIS 확장)과 Redis를 로컬에 설치해 실행
+- 서울 열린데이터광장 API 키, DB·Redis 접속 정보를 `.env`에 설정
+- 도로 링크·매핑 데이터는 `app/load_service_link.py`로 DB에 적재 (최초 1회)
+- 서버 실행: `uvicorn app.main:app` (스케줄러가 함께 시작되어 10분마다 자동 수집)
 - MCP 서버는 Claude Desktop 설정 파일에 `app/mcp_server.py`를 등록해 연동
 
 ## 📝 한계 및 개선 방향
@@ -211,13 +211,11 @@ def get_road_traffic(road_name: str) -> str:
 - **도로명 매핑 불완전**: 서울시 서비스링크 ↔ 표준노드링크 ID 체계가 완전히 일치하지 않아 일부 링크의 도로명이 null로 반환됨
 - **속도 기반 혼잡도**: 교통량(Volume) 데이터 미제공으로 V/C비 기반 LOS 산정 불가 → 속도 기반으로 대체
 - **Redis 캐시 무효화**: 새 수집 완료 시 캐시를 자동으로 삭제하는 로직 미구현
-- **Docker Compose 초기화**: 최초 실행 시 테이블 및 기초 데이터 자동 적재 미구현
 
 ## 📅 Changelog
 
 - **2026.10.21** — MCP 도구 설명 수정, 구간 중복 응답·빈 결과 캐싱 문제 수정
 - **2026.07.07** — 수집 파이프라인 DB 세션 재사용 구조로 개선
-- **2026.05.26** — Docker Compose 환경 구성 추가
 - **2026.05.22** — Redis 캐싱 추가 (worst, road, pattern)
 - **2026.05.08** — MCP 서버 연동, Claude 자연어 질의 구현
 - **2026.04.10** — 수집 주기 15분 → 10분 단축, PostGIS 공간 쿼리 및 구간 좌표 API 추가

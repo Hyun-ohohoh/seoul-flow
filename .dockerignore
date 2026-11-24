@@ -1,0 +1,14 @@
+# 비밀 정보: 이미지에 넣지 않고 compose의 env_file로 실행 시점에 주입
+.env
+
+# 로컬 개발 환경·캐시 (컨테이너는 requirements.txt로 따로 설치)
+venv/
+__pycache__/
+*.pyc
+.git/
+.claude/
+.DS_Store
+
+# 앱 실행에 필요 없는 데이터·노트북 (매핑 적재는 load_service_link.py로 별도 실행)
+*.xlsx
+*.ipynb

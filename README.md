@@ -39,6 +39,7 @@ Seoul Open API (XML)
 | 캐싱 | Redis |
 | AI 연동 | MCP (fastmcp) |
 | 환경변수 | python-dotenv |
+| 컨테이너 | Docker, Docker Compose |
 
 ## 📁 Project Structure
 
@@ -56,6 +57,9 @@ seoul-flow/
 │   ├── redis_client.py           # Redis 연결 설정
 │   ├── main.py                   # FastAPI 앱 진입점 + 스케줄러
 │   └── mcp_server.py             # MCP 서버
+├── Dockerfile                    # FastAPI 앱 이미지
+├── docker-compose.yml            # db(PostGIS)·redis·app 구성
+├── .dockerignore                 # .env·venv 등 이미지 제외 목록
 └── requirements.txt
 ```
 
@@ -200,10 +204,21 @@ def get_road_traffic(road_name: str) -> str:
 
 ## 🚀 실행 환경
 
-- PostgreSQL(PostGIS 확장)과 Redis를 로컬에 설치해 실행
-- 서울 열린데이터광장 API 키, DB·Redis 접속 정보를 `.env`에 설정
-- 도로 링크·매핑 데이터는 `app/load_service_link.py`로 DB에 적재 (최초 1회)
+공통: 서울 열린데이터광장 API 키, DB·Redis 접속 정보를 `.env`에 설정
+
+### Docker Compose로 실행
+- `docker compose up -d --build` → db(PostGIS)·redis·app 컨테이너 실행
+- 컨테이너 안에서는 `localhost`가 자기 자신이므로, app의 DB·Redis 주소는 compose에서 서비스 이름(`db`, `redis`)으로 덮어씀
+- DB 데이터는 named volume(`postgres_data`)에 저장되어 컨테이너를 다시 만들어도 유지
+- `.env`는 `.dockerignore`로 이미지에서 제외하고, 실행 시점에 `env_file`로 주입
+- Apple Silicon에서는 PostGIS 공식 이미지가 arm64를 지원하지 않아 amd64 에뮬레이션으로 실행
+
+### 로컬에서 실행
+- PostgreSQL(PostGIS 확장)과 Redis를 로컬에 설치
 - 서버 실행: `uvicorn app.main:app` (스케줄러가 함께 시작되어 10분마다 자동 수집)
+
+### 데이터 적재 (최초 1회)
+- 매핑 데이터: `app/load_service_link.py`로 `service_link` 테이블 적재
 - MCP 서버는 Claude Desktop 설정 파일에 `app/mcp_server.py`를 등록해 연동
 
 ## 📝 한계 및 개선 방향
@@ -211,6 +226,7 @@ def get_road_traffic(road_name: str) -> str:
 - **도로명 매핑 불완전**: 서울시 서비스링크 ↔ 표준노드링크 ID 체계가 완전히 일치하지 않아 일부 링크의 도로명이 null로 반환됨
 - **속도 기반 혼잡도**: 교통량(Volume) 데이터 미제공으로 V/C비 기반 LOS 산정 불가 → 속도 기반으로 대체
 - **Redis 캐시 무효화**: 새 수집 완료 시 캐시를 자동으로 삭제하는 로직 미구현
+- **DB 초기화 재현성**: 앱 시작 시 자동 생성되는 테이블은 `traffic_speed`뿐이며, `road_link`·`service_link` 스키마와 도로 링크 적재 스크립트가 레포에 없어 새 환경에서 DB를 그대로 재현할 수 없음 → 초기화 스크립트 추가 예정
 
 ## 📅 Changelog
 
